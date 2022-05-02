@@ -12,7 +12,7 @@ output:
 
 # Motiviation
 
-Over the past decade, researchers around the world have generated large amounts of information related to the human gut microbiome. Large scale population studies have cataloged the vast diversity in the human gut microbiome. I wanted to re-visit some of the basic features of the human gut microbiome that are often taken for granted. Such as how many 'species' are present in an individual's gut/fecal sample? In literature, a variety of numbers are menthioned ranging from 100s to 1000s. Similarly, other questions which I am to visualize in this document. `curatedMetagenomicData` is a useful resource for getting basic insights from wealth of publicly available human metagenomes specifically from the gut.
+Over the past decade, researchers around the world have generated large amounts of information related to the human gut microbiome. Large scale population studies have cataloged the vast diversity in the human gut microbiome. I wanted to re-visit some of the basic features of the human gut microbiome that are often taken for granted. Such as how many 'species' are present in an individual's gut/fecal sample? Similarly, other questions which I am to visualize in this document. `curatedMetagenomicData` is a useful resource for getting basic insights from wealth of publicly available human metagenomes specifically from the gut.
 
 ```{r message=FALSE, warning=FALSE}
 library(curatedMetagenomicData)
@@ -23,6 +23,7 @@ library(showtext)
 library(ggdist)
 library(ggtext)
 library(patchwork)
+library(gt)
 ## load fonts
 # font_add_google("Poppins", "Poppins")
 # font_add_google("Roboto Mono", "Roboto Mono")
@@ -72,32 +73,49 @@ Read stored data.
 tse <- readRDS("data/curatedMgDTSE.rds")
 ```
 
+Some information on the data used here.\
+Total number of samples: `r ncol(tse)`\
+Total number of taxa: `r nrow(tse)`\
+Total number of participants: `r length(unique(colData(tse)$subject_id))`\
+Total males: `r table(colData(tse)$gender)[[2]]`\
+Total females: `r table(colData(tse)$gender)[[1]]`\
+Total countries: `r length(unique(colData(tse)$country))`\
+Age: Min: `r min(colData(tse)$age)` years; Max: `r max(colData(tse)$age)` years
+
+Number of participants in age categories:
+
+```{r}
+colData(tse) |> 
+  as.data.frame() |> 
+  dplyr::count(age_category) |> 
+  gt()
+```
+
 # Data Viz
+
+This is also an attempt at visualizing microbiome data mixing some common visualizations in micorbiome such as barplots and some new visualization from Cédric Scherer. Check out his tutorial [here](https://z3tt.github.io/OutlierConf2021/).
 
 ## How many 'species' are there in a gut microbiome?
 
+In literature, a variety of numbers are mentioned ranging from 100s to 1000s. So how many do we observe in metagenomics data? We will use the `estimateRichness` function from [`mia` R package](https://www.bioconductor.org/packages/release/bioc/html/mia.html).
+
 ```{r}
-#colnames(rowData(tse))
+
 tse <- mia::estimateRichness(tse, 
                              abund_values = "relative_abundance", 
                              index = "observed", 
                              name="observed.species")
 
-#table(rowData(tse)$species, useNA="always")
-
-summary(colData(tse)$observed.species)
-
-hist(colData(tse)$age)
-colnames(colData(tse))
-table(colData(tse)$age_category)
 ```
+
+Get data frame from 'colData'.
 
 ```{r}
 tse.df <- as.data.frame(colData(tse))
 
 ```
 
-<https://z3tt.github.io/OutlierConf2021/>
+calculate median, max samples.
 
 ```{r}
 tse.df <- tse.df |> 
@@ -113,6 +131,8 @@ tse.df <- tse.df |>
   mutate(age_category = str_to_title(age_category))
 table(tse.df$age_category)
 ```
+
+Plot the observed species in the age categories.
 
 ```{r fig.height=5, fig.width=8}
 nsamples <- ncol(tse)
@@ -185,13 +205,15 @@ p.main <- ggplot(tse.df, aes(observed.species, age_category, color = age_categor
     legend.position = "none",
     plot.caption = element_text(hjust = 0, face = "italic", color="grey30")
   ) 
-# p.main
+p.main
 ```
 
 ## How many 'species' make-up 90% of the community?
 
+While there are several species in the human gut microbiome, there are few that dominate. So how many of the observed species account for 90% of the total community? here, we choose an arbitrary value of 90%. Other possible threshold can also be used.
+
 ```{r}
-colData(tse)
+#colData(tse)
 tse <- mia::estimateDiversity(tse, 
                               abund_values = "relative_abundance", 
                               index = "coverage", 
@@ -212,9 +234,9 @@ tse.df <- tse.df |>
   mutate(age_category = str_to_title(age_category))
 ```
 
-## Plot coverage
+Plot coverage
 
-```{r}
+```{r fig.height=5, fig.width=8}
 tse.df <- tse.df %>%
   mutate(age_category2 = factor(as.character(age_category), levels = rev(c("Senior", "Adult",
                                                                            "Schoolage", "Child",
@@ -285,12 +307,14 @@ p.cov <- ggplot(tse.df, aes(Coverage, age_category2, color = age_category2,
     legend.position = "none",
     plot.caption = element_text(hjust = 0, face = "italic", color="grey30")
   ) 
-# p.cov
+p.cov
 ```
 
 ## What are the most diverse phyla?
 
-```{r}
+The most common phylum in the human gut are Firmicutes, Proteobacteria, Actinobacteria, Bacteroidetes, Fusobacteria. So which of these has the highest representation?
+
+```{r fig.height=4, fig.width=6}
 phy.df <- rowData(tse) |> 
   as.data.frame() |> 
   count(phylum) |> 
@@ -317,10 +341,12 @@ p.phy <- phy.df |>
     legend.position = "none",
     plot.caption = element_text(hjust = 0, face = "italic", color="grey30")
   ) 
-
+p.phy
 ```
 
 ## Which genera are dominant in different age groups?
+
+While there are several genera in the human gut and we saw above that few account for 90% of the total community. It is interesting to check which genera are commonly dominate samples from different age categories. Like, Bifidobacteria are known to dominate in new borns compared to adults.
 
 ```{r warning=FALSE, fig.height=5, fig.width=8}
 dominant_taxa <- mia::countDominantTaxa(tse,
@@ -378,13 +404,15 @@ p.dom <- dominant_taxa |>
        #subtitle = "Median values shown in plot",
        caption = "Data: Pasolli E, Schiffer L, Manghi P, et. al., (2017).\nNature Methods, doi:10.1038/nmeth.4468.\nAccessed on 2022-05-01. Visualization by Shetty SA")
 # 
-# p.dom 
+p.dom 
 
 ```
 
 ## How does number of observed species vary across age?
 
-```{r}
+Another widely accepted fact is that, number of species tend to increase as we grow older and at adult stage it more or less stabilizes. Here, we have majority cross-sectional samples with few repeated samples. For the sake of simplicity, we plot all samples from different ages.
+
+```{r fig.height=5, fig.width=12}
 #, alpha=0.5
 p.age <- tse.df |> 
   ggplot(aes(age,observed.species))+
@@ -407,6 +435,7 @@ p.age <- tse.df |>
     plot.caption = element_text(hjust = 0, face = "italic", color="grey30")
   )
 
+p.age
 ```
 
 ```{r fig.height=8, fig.width=12, eval=FALSE}
@@ -417,7 +446,9 @@ ggsave("overview01.png", dpi=180)
 
 ## How does phylum composition vary across age?
 
-```{r}
+There are differences in composition between age groups. Here, we visualize compositions across age use the commonly used barplots.
+
+```{r fig.height=5, fig.width=12}
 tse.phy <- mia::agglomerateByRank(tse, "phylum")
 unique(rownames(rowData(tse.phy)))
 
@@ -450,12 +481,14 @@ p.comp <- microbiome::plot_composition(ps.phy.r, sample.sort = "age",
     #legend.position = "none",
     plot.caption = element_text(hjust = 0, face = "italic", color="grey30")
   ) 
-
+p.comp
 ```
 
 # Combine all plots
 
-```{r fig.height=12, fig.width=14}
+We can combine all these plots to create a poster like figure.
+
+```{r fig.height=10, fig.width=14}
 
 (p.main + p.cov) / (p.phy + p.dom) / (p.age/p.comp) + 
   plot_layout(widths = c(1,1,2), heights = c(1,1,2)) +
@@ -463,6 +496,11 @@ p.comp <- microbiome::plot_composition(ps.phy.r, sample.sort = "age",
 ggsave("overview03.pdf", h=12, w=14)
 
 ```
+
+If you have questions or suggestions feel free to contact me:\
+sudarshanshetty9[\@]gmail[dot]com
+
+Below are the packages and versions used for the analysis.
 
 ```{r}
 devtools::session_info()
