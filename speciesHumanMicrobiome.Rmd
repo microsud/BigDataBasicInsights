@@ -10,7 +10,7 @@ output:
     code_folding: hide
 ---
 
-# Motiviation
+# Motivation
 
 Over the past decade, researchers around the world have generated large amounts of information related to the human gut microbiome. Large scale population studies have cataloged the vast diversity in the human gut microbiome. I wanted to re-visit some of the basic features of the human gut microbiome that are often taken for granted. Such as how many 'species' are present in an individual's gut/fecal sample? Similarly, other questions which I am to visualize in this document. `curatedMetagenomicData` is a useful resource for getting basic insights from wealth of publicly available human metagenomes specifically from the gut.
 
@@ -134,7 +134,7 @@ table(tse.df$age_category)
 
 Plot the observed species in the age categories.
 
-```{r fig.height=5, fig.width=8}
+```{r fig.height=3, fig.width=5}
 nsamples <- ncol(tse)
 
 tse.df <- tse.df %>%
@@ -219,7 +219,7 @@ tse <- mia::estimateDiversity(tse,
                               index = "coverage", 
                               name="Coverage")
 
-tse
+# tse
 tse.df <- as.data.frame(colData(tse))
 tse.df <- tse.df |> 
   group_by(age_category) %>% 
@@ -236,7 +236,7 @@ tse.df <- tse.df |>
 
 Plot coverage
 
-```{r fig.height=5, fig.width=8}
+```{r fig.height=3, fig.width=5}
 tse.df <- tse.df %>%
   mutate(age_category2 = factor(as.character(age_category), levels = rev(c("Senior", "Adult",
                                                                            "Schoolage", "Child",
@@ -314,7 +314,7 @@ p.cov
 
 The most common phylum in the human gut are Firmicutes, Proteobacteria, Actinobacteria, Bacteroidetes, Fusobacteria. So which of these has the highest representation?
 
-```{r fig.height=4, fig.width=6}
+```{r fig.height=2, fig.width=4}
 phy.df <- rowData(tse) |> 
   as.data.frame() |> 
   count(phylum) |> 
@@ -348,7 +348,7 @@ p.phy
 
 While there are several genera in the human gut and we saw above that few account for 90% of the total community. It is interesting to check which genera are commonly dominate samples from different age categories. Like, Bifidobacteria are known to dominate in new borns compared to adults.
 
-```{r warning=FALSE, fig.height=5, fig.width=8}
+```{r warning=FALSE, fig.height=3, fig.width=6}
 dominant_taxa <- mia::countDominantTaxa(tse,
                                         rank = "genus",
                                         group = "age_category",
@@ -362,10 +362,10 @@ tax.plot <- dominant_taxa |>
   filter(sum >10) |> 
   pull(dominant_taxa)
 
-dominant_taxa |> 
-  mutate(dominant_taxa2 = ifelse(dominant_taxa %in% tax.plot, dominant_taxa, "Other")) |> 
-  ggplot(aes(age_category, rel.freq)) +
-  geom_col(aes(fill=dominant_taxa2))
+# dominant_taxa |> 
+#   mutate(dominant_taxa2 = ifelse(dominant_taxa %in% tax.plot, dominant_taxa, "Other")) |> 
+#   ggplot(aes(age_category, rel.freq)) +
+#   geom_col(aes(fill=dominant_taxa2))
 
 
 p.dom <- dominant_taxa |> 
@@ -412,7 +412,7 @@ p.dom
 
 Another widely accepted fact is that, number of species tend to increase as we grow older and at adult stage it more or less stabilizes. Here, we have majority cross-sectional samples with few repeated samples. For the sake of simplicity, we plot all samples from different ages.
 
-```{r fig.height=5, fig.width=12}
+```{r fig.height=3, fig.width=9}
 #, alpha=0.5
 p.age <- tse.df |> 
   ggplot(aes(age,observed.species))+
@@ -448,7 +448,7 @@ ggsave("overview01.png", dpi=180)
 
 There are differences in composition between age groups. Here, we visualize compositions across age use the commonly used barplots.
 
-```{r fig.height=5, fig.width=12}
+```{r fig.height=3, fig.width=9}
 tse.phy <- mia::agglomerateByRank(tse, "phylum")
 unique(rownames(rowData(tse.phy)))
 
@@ -488,7 +488,7 @@ p.comp
 
 We can combine all these plots to create a poster like figure.
 
-```{r fig.height=10, fig.width=14}
+```{r fig.height=8, fig.width=12}
 
 (p.main + p.cov) / (p.phy + p.dom) / (p.age/p.comp) + 
   plot_layout(widths = c(1,1,2), heights = c(1,1,2)) +
