@@ -71,6 +71,8 @@ Read stored data.
 
 ```{r}
 tse <- readRDS("data/curatedMgDTSE.rds")
+
+table(rowData(tse)$superkingdom)
 ```
 
 Some information on the data used here.\
@@ -189,10 +191,10 @@ p.main <- ggplot(tse.df, aes(observed.species, age_category, color = age_categor
   coord_cartesian(xlim = c(1.2, NA), clip = "off")+
   scale_color_manual("Age category",values = age.cols) +
   scale_fill_manual("Age category", values = age.cols) +
-  labs(#title = "" ,
-    subtitle = "How many 'species' are there in a gut microbiome?\nMedian values shown in plot",
-    y="", x=glue::glue("Observed Species (N = {nsamples})"),
-    caption = "Data: Pasolli E, Schiffer L, Manghi P, et. al., (2017).\nNature Methods, doi:10.1038/nmeth.4468.\nAccessed on 2022-05-01. Visualization by Shetty SA") +
+  labs(title = "How many 'species' are observed in a gut microbiome?" ,
+    subtitle = glue::glue("Samples marked as 'healthy' in curatedMetagenomicData (N = {nsamples}).\nMedian numbers in the plot") ,
+    y="", x="Observed Species",
+    caption = "Data source: Pasolli E, Schiffer L, Manghi P, et. al., (2017).\nNature Methods, doi:10.1038/nmeth.4468.\nAccessed on 2022-05-01.\nVisualization by Shetty SA.\nPlot Code from Cédric Scherer") +
   theme(
     panel.grid.major.x = element_line(size = .35),
     panel.grid.major.y = element_blank(),
@@ -200,7 +202,8 @@ p.main <- ggplot(tse.df, aes(observed.species, age_category, color = age_categor
     axis.text.x = element_text(size = 13, hjust = 1),
     axis.ticks.length = unit(0, "lines"),
     plot.title.position = 'plot',
-    plot.subtitle = element_text(size = 12, color = "grey30"),
+    plot.title = element_text(size = 13, color = "grey20"),
+    plot.subtitle = element_text(size = 10, color = "grey30"),
     plot.margin = margin(10, 25, 10, 25),
     legend.position = "none",
     plot.caption = element_text(hjust = 0, face = "italic", color="grey30")
@@ -223,6 +226,7 @@ tse <- mia::estimateDiversity(tse,
 tse.df <- as.data.frame(colData(tse))
 tse.df <- tse.df |> 
   group_by(age_category) %>% 
+  mutate(perc_cov= (Coverage/observed.species)*100) |> 
   mutate(
     n.cov = n(),
     median.cov = median(Coverage),
@@ -231,12 +235,13 @@ tse.df <- tse.df |>
   ungroup()
 
 tse.df <- tse.df |> 
-  mutate(age_category = str_to_title(age_category))
+  mutate(age_category = str_to_title(age_category))  
+  
 ```
 
 Plot coverage
 
-```{r fig.height=3, fig.width=5}
+```{r fig.height=4, fig.width=5}
 tse.df <- tse.df %>%
   mutate(age_category2 = factor(as.character(age_category), levels = rev(c("Senior", "Adult",
                                                                            "Schoolage", "Child",
@@ -255,32 +260,18 @@ p.cov <- ggplot(tse.df, aes(Coverage, age_category2, color = age_category2,
   ) +
   geom_boxplot(
     alpha=0.2,
-    width = .15, 
-    outlier.shape = NA
-  ) +
-  ggdist::stat_halfeye(
-    aes(
-      y = age_category2,
-      color = age_category2,
-      fill = after_scale(colorspace::lighten(color, .5))
-    ),
-    shape = 18,
-    point_size = 3,
-    interval_size = 1.8,
-    adjust = .5,
-    .width = c(0, 1),
-    show.legend = FALSE
-  ) +
+    width = .3, 
+    outlier.shape = NA) +
   geom_text(
     aes(x = median.cov, label = format(round(median.cov, 2), nsmall = 2)),
     stat = "unique",
     #color = "grey70",
     fontface = "bold",
     size = 3.4,
-    nudge_y = .15
+    nudge_y = .3
   ) +
   geom_text(
-    aes(x = max.cov, label = glue::glue("n = {n.cov}")),
+    aes(x = 45, label = glue::glue("n = {n.cov}")),
     stat = "unique",
     fontface = "bold",
     size = 3.5,
@@ -292,9 +283,9 @@ p.cov <- ggplot(tse.df, aes(Coverage, age_category2, color = age_category2,
   scale_color_manual("Age category",values = age.cols) +
   scale_fill_manual("Age category", values = age.cols) +
   labs(#title = "" ,
-    subtitle = "How many 'species' make-up 90% of the community?",
+    subtitle = "How many 'species' make-up 90% of the gut community?",
     y="", x=glue::glue("No. of species accounting\nfor 90% of the total community"),
-    caption = "Data: Pasolli E, Schiffer L, Manghi P, et. al., (2017).\nNature Methods, doi:10.1038/nmeth.4468.\nAccessed on 2022-05-01. Visualization by Shetty SA") +
+    caption = "Data source: Pasolli E, Schiffer L, Manghi P, et. al., (2017).\nNature Methods, doi:10.1038/nmeth.4468.\nAccessed on 2022-05-01.\nVisualization: Sudarshan A. Shetty.") +
   theme(
     panel.grid.major.x = element_line(size = .35),
     panel.grid.major.y = element_blank(),
@@ -314,35 +305,49 @@ p.cov
 
 The most common phylum in the human gut are Firmicutes, Proteobacteria, Actinobacteria, Bacteroidetes, Fusobacteria. So which of these has the highest representation?
 
-```{r fig.height=2, fig.width=4}
+```{r fig.height=3, fig.width=5}
 phy.df <- rowData(tse) |> 
   as.data.frame() |> 
   count(phylum) |> 
   arrange(desc(n)) |> 
-  mutate(Phylum=ifelse(n >10, phylum, "Others"))
+  mutate(Phylum=ifelse(n >10, phylum, "Others")) |> 
+  group_by(Phylum) |> 
+  summarise(n=sum(n)) |> 
+  mutate(species=paste0("n = ", "")) |> 
+  mutate(perc = (n/sum(n))*100)
 
 
 p.phy <- phy.df |> 
-  ggplot(aes(n, reorder(Phylum, n)))+
+  ggplot(aes(perc, reorder(Phylum, perc)))+
   geom_col(fill="#0a9396") +
-  labs(#title = "" ,
-    subtitle = "What are the most diverse phyla?",
-    y="", x="Number of species",
-    caption = "Data: Pasolli E, Schiffer L, Manghi P, et. al., (2017).\nNature Methods, doi:10.1038/nmeth.4468.\nAccessed on 2022-05-01. Visualization by Shetty SA") +
+  geom_text(
+    aes(label = glue::glue("No. = {n}"), x=50), 
+    ## make labels left-aligned
+    hjust = 1, nudge_x = 1
+  )+
+  ## make sure labels doesn't get cut, part 1
+  coord_cartesian(clip = "off") +
+  scale_x_continuous(expand = c(.01, .01)) +
+  scale_fill_identity(guide = "none") +
   theme(
     panel.grid.major.x = element_line(size = .35),
     panel.grid.major.y = element_blank(),
     axis.text.y = element_text(size = 13, hjust = 1),
-    axis.text.x = element_text(size = 13, hjust = 1),
+    axis.text.x = element_text(size = 13),
     axis.ticks.length = unit(0, "lines"),
     plot.title.position = 'plot',
     plot.subtitle = element_text(size = 12, color = "grey30"),
     plot.margin = margin(10, 25, 10, 25),
     legend.position = "none",
-    plot.caption = element_text(hjust = 0, face = "italic", color="grey30")
-  ) 
+    plot.caption = element_text(hjust = 0, face = "italic", color="grey30")) +
+  labs(subtitle = "Which phylum has most species in human gut?" ,
+    #subtitle = glue::glue("Samples marked as 'healthy' in curatedMetagenomicData (N = {nsamples}).\nMedian numbers in the plot") ,
+    y="", x="Percent of species",
+    caption = "Data source: Pasolli E, Schiffer L, Manghi P, et. al., (2017).\nNature Methods, doi:10.1038/nmeth.4468.\nAccessed on 2022-05-01.\nVisualization: Sudarshan A. Shetty.")
+
 p.phy
 ```
+
 
 ## Which genera are dominant in different age groups?
 
@@ -362,12 +367,6 @@ tax.plot <- dominant_taxa |>
   filter(sum >10) |> 
   pull(dominant_taxa)
 
-# dominant_taxa |> 
-#   mutate(dominant_taxa2 = ifelse(dominant_taxa %in% tax.plot, dominant_taxa, "Other")) |> 
-#   ggplot(aes(age_category, rel.freq)) +
-#   geom_col(aes(fill=dominant_taxa2))
-
-
 p.dom <- dominant_taxa |> 
   mutate(dominant_taxa2 = ifelse(dominant_taxa %in% tax.plot, dominant_taxa, "Other")) |> 
   mutate(dominant_taxa3 = ifelse(dominant_taxa %in% tax.plot, paste0("*",dominant_taxa,"*"), "Other")) |> 
@@ -379,8 +378,10 @@ p.dom <- dominant_taxa |>
   geom_col(alpha=0.9)+
   ## make sure labels doesn't get cut, part 1
   coord_cartesian(clip = "off") +
-  #scale_fill_identity(guide = "none") +
-  #facet_grid(~age_category, scales = "free") +
+  labs(subtitle = "Which genera are dominant in different age groups?" ,
+    #subtitle = glue::glue("Samples marked as 'healthy' in curatedMetagenomicData (N = {nsamples}).\nMedian numbers in the plot") ,
+    y="", x="Percent of samples dominanted",
+    caption = "Data source: Pasolli E, Schiffer L, Manghi P, et. al., (2017).\nNature Methods, doi:10.1038/nmeth.4468.\nAccessed on 2022-05-01.\nVisualization: Sudarshan A. Shetty.") +
   theme(
     legend.text = element_markdown(),
     axis.text.y = element_text(size = 13, hjust = 1),
@@ -398,15 +399,19 @@ p.dom <- dominant_taxa |>
   ) +
   scale_fill_manual("Dominant Genera", values = c("#219ebc", "#4b3f72", "#245501", 
                                                   "#81b29a", "#0d47a1", "#A71969", 
-                                                  "#603808","#19647e", "steelblue")) +
-  labs(x="Percent of samples dominanted", y="",
-       subtitle = "Which genera are dominant in different age groups?" ,
-       #subtitle = "Median values shown in plot",
-       caption = "Data: Pasolli E, Schiffer L, Manghi P, et. al., (2017).\nNature Methods, doi:10.1038/nmeth.4468.\nAccessed on 2022-05-01. Visualization by Shetty SA")
+                                                  "#603808","#19647e", "steelblue")) 
 # 
 p.dom 
 
 ```
+
+```{r}
+# p.main
+# p.main + p.phy + plot_layout(widths = c(2,1), heights = c(2,0.5)) +
+#   plot_annotation(title = "Big Data, Basic Insights")
+```
+
+
 
 ## How does number of observed species vary across age?
 
@@ -488,7 +493,7 @@ p.comp
 
 We can combine all these plots to create a poster like figure.
 
-```{r fig.height=8, fig.width=12}
+```{r fig.height=7, fig.width=10}
 
 (p.main + p.cov) / (p.phy + p.dom) / (p.age/p.comp) + 
   plot_layout(widths = c(1,1,2), heights = c(1,1,2)) +
